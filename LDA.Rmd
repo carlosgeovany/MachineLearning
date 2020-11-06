@@ -84,20 +84,26 @@ Nombre de función: var.covar
 Parámetros:    
 a) Data frame con los datos   
 b) Nombre de la columna que contiene la clase a predecir   
-c) Lista con los nombres de las variables independientes con los que se calculará la estimación de la varianza/covarianza   
-d) Clase sobre la que se calculará la estimación de la varianza/covarianza   
+c) Lista con los nombres de las variables independientes con los que se calculará la estimación de la varianza/covarianza     
 Regresa:   
 Valor o Matriz con la  varianza/covarianza donde cada columna mantiene el mismo orden de la lista de las variables independientes que se pasaron como parámetro
 
 ```{r}
-
-var.covar<-function(df,pred_colname,indvar,ck){
-  filt= df%>%
-    filter((!!sym(pred_colname))==ck)%>%
+var.covar<-function(df,pred_colname,indvar){
+  var_1= df%>%
+    filter((!!sym(pred_colname))=='setosa')%>%
     select(unlist(indvar))
-           var_matrix=cov(filt)
-           return(var_matrix)
-           
+           var_m1=cov(var_1)
+    var_2= df%>%
+    filter((!!sym(pred_colname))=='versicolor')%>%
+    select(unlist(indvar))
+           var_m2=cov(var_2)
+    var_3= df%>%
+    filter((!!sym(pred_colname))=='virginica')%>%
+    select(unlist(indvar))
+           var_m3=cov(var_3)
+   var_pool=var_m1+var_m2+var_m3/dim(df)[1]
+    return(var_pool)
 }
 
 ```
@@ -119,7 +125,7 @@ delta<-function(vector, p_apriori, v_medias,m_var){
   vector_x=as.numeric(vector)
   apri = as.vector(p_apriori)
   mean = as.matrix(v_medias)
-  discri_value<-vector_x%*%solve(m_var)%*%mean-.5*t(mean)%*%solve(m_var)%*%mean+log(apri)
+  discri_value<-vector_x%*%solve(m_var)%*%mean-(.5)*t(mean)%*%solve(m_var)%*%mean+log(apri)
   return (discri_value)
   
 }
@@ -138,9 +144,16 @@ Clase a la que pertenece la observación
 
 ```{r}
 
-clasifica<-function(obs,pi,mu,sigma){
+clasifica<-function(obs,params){
+  mu1<-unlist(params[[1]][2])
+  mu2<-unlist(params[[2]][2])
+  mu3<-unlist(params[[3]][2])
+
+  pi1<-unlist(params[[1]][1])
+  pi2<-unlist(params[[2]][1])
+  pi3<-unlist(params[[3]][1])
   
-  deltas<-cbind(delta(obs,pi[1,],mu[1,],sigma),delta(obs,pi[2,],mu[2,],sigma),delta(obs,pi[3,],mu[3,],sigma))
+  deltas<-cbind(delta(obs,pi1,mu1,sigma),delta(obs,pi2,mu2,sigma),delta(obs,pi3,mu3,sigma))
   colnames(deltas)<-c("setosa","versicolor","virginica")
   k<-colnames(deltas)[deltas==max(deltas)]
   return(k)
@@ -164,6 +177,7 @@ pred_colname<-"Species"
 # Variables independientes
 indvar<-list("Sepal.Length" ,"Sepal.Width",  "Petal.Length", "Petal.Width" )
 
+
 # Probabilidad por clase
 ap_k1<-apriori(train,pred_colname,"setosa")
 ap_k2<-apriori(train,pred_colname,"versicolor")
@@ -174,19 +188,19 @@ mu_k1<-media(train,pred_colname,indvar,"setosa")
 mu_k2<-media(train,pred_colname,indvar,"versicolor")
 mu_k3<-media(train,pred_colname,indvar,"virginica")
   
-mu<-rbind(mu_k1,mu_k2,mu_k3)
-pi<-rbind(ap_k1,ap_k2,ap_k3)
+
 
 # Varianza/covarianza para todos los datos (todos poseen la misma varianza/covarianza)
-sigma<-var.covar(train,pred_colname,indvar,"setosa")
+sigma<-var.covar(train,pred_colname,indvar)
 
+params<-list(clase1=list(ap_k1,mu_k1,sigma),clase2=list(ap_k2,mu_k2,sigma),clase3=list(ap_k3,mu_k3,sigma))
 # Probamos nuestro modelo con el 20% restante
 results<-matrix(nrow=0,ncol=2)
 test<-iris[-df,]
 
 for(i in 1:nrow(test)){
-  x<-sapply(test[i,1:4],as.numeric)
-  r<-clasifica(x,pi,mu,sigma)
+  x<-as.numeric(test[i,unlist(indvar)])
+  r<-clasifica(x,params)
   results<-rbind(results,c(r,as.character(test[i,5])))
 }
 
@@ -199,4 +213,43 @@ Usamos la función confusionMatrix() de la librería [caret](https://www.rdocume
 library(caret)
 cat("error:",error)
 confusionMatrix(table(results[,1],results[,2]))
+```
+
+Por último, contrastamos el poder predictivo del modelo únicamente con la variable Petal length
+
+```{r}
+
+indvar<-list("Petal.Length")
+
+# Probabilidad por clase
+ap_k1<-apriori(train,pred_colname,"setosa")
+ap_k2<-apriori(train,pred_colname,"versicolor")
+ap_k3<-apriori(train,pred_colname,"virginica")
+
+# Media por clase
+mu_k1<-media(train,pred_colname,indvar,"setosa")
+mu_k2<-media(train,pred_colname,indvar,"versicolor")
+mu_k3<-media(train,pred_colname,indvar,"virginica")
+  
+
+
+# Varianza/covarianza para todos los datos (todos poseen la misma varianza/covarianza)
+sigma<-var.covar(train,pred_colname,indvar)
+
+params<-list(clase1=list(ap_k1,mu_k1,sigma),clase2=list(ap_k2,mu_k2,sigma),clase3=list(ap_k3,mu_k3,sigma))
+# Probamos nuestro modelo con el 20% restante
+results<-matrix(nrow=0,ncol=2)
+test<-iris[-df,]
+
+for(i in 1:nrow(test)){
+  x<-as.numeric(test[i,unlist(indvar)])
+  r<-clasifica(x,params)
+  results<-rbind(results,c(r,as.character(test[i,5])))
+}
+
+error<-sum(results[,1]!=results[,2])/nrow(results)
+
+cat("error:",error)
+confusionMatrix(table(results[,1],results[,2]))
+
 ```
