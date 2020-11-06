@@ -1,0 +1,202 @@
+---
+title: "Tarea 1: Linear Discrimant Analysis en R"
+author: "Jose Reyez Garza, Braulio Piña Amaros, Carlos Perez Velazquez"
+date: "9/1/2020"
+output: html_document
+---
+
+El objetivo de la primer tarea es realizar un programa en R que codifique el algoritmo de análisis discriminante lineal. Se asumirá que todas las variables independientes son continuas con distribución normal.
+
+```{r}
+
+#librerías a utilizar
+library(tidyr)
+library(dplyr)
+
+```
+
+## Obtenemos nuestro dataset
+
+```{r}
+
+iris<-datasets::iris
+# sembramos una semilla para reproducibilidad
+set.seed(1983)
+
+```
+
+## Definimos nuestras funciones
+
+Función que calcula la estimación de la probabilidad a-priori para una clase.   
+Nombre de función: apriori   
+Parámetros:    
+a) df: Data frame con los datos   
+b) pred_colname:Nombre de la columna que contiene la clase a predecir   
+c) ck:Clase sobre la que se calculara la estimación de la probabilidad a-priori   
+Regresa:   
+Probabilidad a-priori   
+
+```{r}
+
+apriori<-function(df,pred_colname,ck){
+  
+  obs=nrow(df)
+  pi_k=df%>%
+    select(pred_colname)%>%
+    filter(.==ck)%>%
+    nrow()%>%
+    (function(x) x/obs)
+  
+  if(pi_k==0){
+    pi_k=.0001
+  }
+  
+  return(pi_k)
+}
+
+```
+
+Función que calcula la estimación de la media del PDF para una clase.   
+Nombre de función: media   
+Parámetros:    
+a) df:  Data frame con los datos   
+b)pred_colname: Nombre de la columna que contiene la clase a predecir   
+c) indvar: Lista con los nombres de las variables independientes con los que se calculará la media.    
+d) ck: Clase sobre la que se calculará la estimación de la media   
+Regresa:   
+Vector con la media donde cada elemento mantiene el mismo orden de la lista de las variables independientes que se pasaron como parámetro
+
+```{r}
+
+media<-function(df,pred_colname,indvar,ck){
+  
+  means<-df%>%
+    filter((!!sym(pred_colname))==ck)%>%
+    select(unlist(indvar))%>%
+    colMeans()
+  
+  return(means)
+}
+```
+
+Función que calcula la estimación de la varianza/covarianza del PDF para todos los datos. (se asume que todas las variables independientes poseen la misma varianza/covarianza).
+Nombre de función: var.covar   
+Parámetros:    
+a) Data frame con los datos   
+b) Nombre de la columna que contiene la clase a predecir   
+c) Lista con los nombres de las variables independientes con los que se calculará la estimación de la varianza/covarianza   
+d) Clase sobre la que se calculará la estimación de la varianza/covarianza   
+Regresa:   
+Valor o Matriz con la  varianza/covarianza donde cada columna mantiene el mismo orden de la lista de las variables independientes que se pasaron como parámetro
+
+```{r}
+
+var.covar<-function(df,pred_colname,indvar,ck){
+  filt= df%>%
+    filter((!!sym(pred_colname))==ck)%>%
+    select(unlist(indvar))
+           var_matrix=cov(filt)
+           return(var_matrix)
+           
+}
+
+```
+
+Función que calcula el discriminante para una clase dada.   
+Nombre de función: delta   
+Parámetros:    
+a) Vector numérico X con los valores a clasificar. Deben proporcionarse en el mismo orden con el que se estimaron la media y la varianza/covarianza 
+b) probabilidad a-priori estimada para esa clase   
+c) Media estimada para esa clase   
+d) varianza/covarianza estimada para esa clase   
+Regresa:   
+Valor del discriminante para la clase dada
+
+
+```{r}
+
+delta<-function(vector, p_apriori, v_medias,m_var){
+  vector_x=as.numeric(vector)
+  apri = as.vector(p_apriori)
+  mean = as.matrix(v_medias)
+  discri_value<-vector_x%*%solve(m_var)%*%mean-.5*t(mean)%*%solve(m_var)%*%mean+log(apri)
+  return (discri_value)
+  
+}
+
+```
+
+Función que clasifiqua una o más observaciones   
+Nombre de función: clasifica   
+Parámetros:    
+a) Vector numérico X con los valores a clasificar. Deben proporcionarse en el mismo orden con el que se estimaron la media y la varianza/covarianza    
+b) probabilidad a-priori estimada para esa clase   
+c) Media estimada para esa clase   
+d) varianza/covarianza estimada para esa clase   
+Regresa
+Clase a la que pertenece la observación
+
+```{r}
+
+clasifica<-function(obs,pi,mu,sigma){
+  
+  deltas<-cbind(delta(obs,pi[1,],mu[1,],sigma),delta(obs,pi[2,],mu[2,],sigma),delta(obs,pi[3,],mu[3,],sigma))
+  colnames(deltas)<-c("setosa","versicolor","virginica")
+  k<-colnames(deltas)[deltas==max(deltas)]
+  return(k)
+}
+
+```
+
+### Entrenamiento y Pruebas
+
+```{r}
+
+# Se divide el dataset en 80% para entrenamiento y 20% para pruebas
+df = sort(sample(nrow(iris), nrow(iris)*.8))
+
+# 80% de las observaciones para entrenamiento
+train<-iris[df,]
+
+# Se define el nombre de la columna que contiene la clase a predecir
+pred_colname<-"Species"
+
+# Variables independientes
+indvar<-list("Sepal.Length" ,"Sepal.Width",  "Petal.Length", "Petal.Width" )
+
+# Probabilidad por clase
+ap_k1<-apriori(train,pred_colname,"setosa")
+ap_k2<-apriori(train,pred_colname,"versicolor")
+ap_k3<-apriori(train,pred_colname,"virginica")
+
+# Media por clase
+mu_k1<-media(train,pred_colname,indvar,"setosa")
+mu_k2<-media(train,pred_colname,indvar,"versicolor")
+mu_k3<-media(train,pred_colname,indvar,"virginica")
+  
+mu<-rbind(mu_k1,mu_k2,mu_k3)
+pi<-rbind(ap_k1,ap_k2,ap_k3)
+
+# Varianza/covarianza para todos los datos (todos poseen la misma varianza/covarianza)
+sigma<-var.covar(train,pred_colname,indvar,"setosa")
+
+# Probamos nuestro modelo con el 20% restante
+results<-matrix(nrow=0,ncol=2)
+test<-iris[-df,]
+
+for(i in 1:nrow(test)){
+  x<-sapply(test[i,1:4],as.numeric)
+  r<-clasifica(x,pi,mu,sigma)
+  results<-rbind(results,c(r,as.character(test[i,5])))
+}
+
+error<-sum(results[,1]!=results[,2])/nrow(results)
+
+```
+
+Usamos la función confusionMatrix() de la librería [caret](https://www.rdocumentation.org/packages/caret/versions/3.45/topics/confusionMatrix) para medir nuestros resultados
+```{r}
+library(caret)
+cat("error:",error)
+confusionMatrix(table(results[,1],results[,2]))
+```
