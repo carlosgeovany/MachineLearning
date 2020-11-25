@@ -1,15 +1,5 @@
-
-def class_counts(rows):
-    """Counts the number of each type of example in a dataset."""
-    counts = {}  # a dictionary of label -> count.
-    for row in rows:
-        # in our dataset format, the label is always the last column
-        label = row[-1]
-        if label not in counts:
-            counts[label] = 0
-        counts[label] += 1
-    return counts
-
+"""
+"""
 
 class Question:
     """A Question is used to partition a dataset.
@@ -45,7 +35,7 @@ class Question:
         condition = "=="
         if self.is_numeric(self.value):
             condition = ">="
-        return f"Is {self.header[self.column]} {condition} {self.value}?"
+        return f"{self.header[self.column]} {condition} {self.value}"
 
 class Leaf:
     """A Leaf node classifies data.
@@ -66,15 +56,29 @@ class Decision_Node:
     def __init__(self,
                  question,
                  true_branch,
-                 false_branch):
+                 false_branch,
+                 samples):
         self.question = question
         self.true_branch = true_branch
         self.false_branch = false_branch
+        self.samples = samples
+
+def class_counts(rows):
+    """Counts the number of each type of example in a dataset."""
+    counts = {}  # a dictionary of label -> count.
+    for row in rows:
+        # in our dataset format, the label is always the last column
+        label = row[-1]
+        if label not in counts:
+            counts[label] = 0
+        counts[label] += 1
+    return counts
 
 class CART:
 
-    def __init__(self, header):
+    def __init__(self, header, max_depth=None):
         self.header = header
+        self.max_depth = max_depth
 
 
     def partition(self, rows, question):
@@ -152,10 +156,10 @@ class CART:
                 if gain >= best_gain:
                     best_gain, best_question = gain, question
 
-        return best_gain, best_question
+        return best_gain, best_question, current_uncertainty, sum(list(values))
 
 
-    def fit(self, rows):
+    def fit(self, rows, depht=0):
         """Builds the tree.
 
         Rules of recursion: 1) Believe that it works. 2) Start by checking
@@ -165,13 +169,14 @@ class CART:
 
         # Try partitioing the dataset on each of the unique attribute,
         # calculate the information gain,
-        # and return the question that produces the highest gain.        
-        gain, question = self.find_best_split(rows)
+        # and return the question that produces the highest gain.      
+        
+        gain, question, gini, samples = self.find_best_split(rows)
 
         # Base case: no further info gain
         # Since we can ask no further questions,
         # we'll return a leaf.
-        if gain == 0:
+        if (gain == 0) or (depht == self.max_depth):
             return Leaf(rows)
             
         # If we reach here, we have found a useful feature / value
@@ -179,17 +184,25 @@ class CART:
         true_rows, false_rows = self.partition(rows, question)
 
         # Recursively build the true branch.
-        true_branch = self.fit(true_rows)
+        true_branch = self.fit(true_rows, depht+1)
 
         # Recursively build the false branch.
-        false_branch = self.fit(false_rows)
+        false_branch = self.fit(false_rows, depht+1)
 
-        
         # Return a Question node.
         # This records the best feature / value to ask at this point,
         # as well as the branches to follow
         # dependingo on the answer.
-        return Decision_Node(question, true_branch, false_branch)
+        return Decision_Node(question, true_branch, false_branch, samples)
+
+
+    def print_leaf(self, counts):
+        """A nicer way to print the predictions at a leaf."""
+        total = sum(counts.values()) * 1.0
+        probs = {}
+        for lbl in counts.keys():
+            probs[lbl] = str(int(counts[lbl] / total * 100)) + "%"
+        return probs
 
 
     def print_tree(self, node, spacing=""):
@@ -197,18 +210,18 @@ class CART:
 
         # Base case: we've reached a leaf
         if isinstance(node, Leaf):
-            print (spacing + "Predict", node.predictions)
+            print (f"{spacing} Predict {self.print_leaf(node.predictions)}")
             return
 
         # Print the question at this node
-        print (spacing + str(node.question))
+        print (f"{spacing} {node.question}")
 
         # Call this function recursively on the true branch
-        print (spacing + '--> True:')
+        print (f"{spacing} --> True:")
         self.print_tree(node.true_branch, spacing + "  ")
 
         # Call this function recursively on the false branch
-        print (spacing + '--> False:')
+        print (f"{spacing} --> False:")
         self.print_tree(node.false_branch, spacing + "  ")
 
 
@@ -217,7 +230,7 @@ class CART:
 
         # Base case: we've reached a leaf
         if isinstance(node, Leaf):
-            return node.predictions
+            return self.print_leaf(node.predictions)
 
         # Decide whether to follow the true-branch or the false-branch.
         # Compare the feature / value stored in the node,
@@ -228,10 +241,4 @@ class CART:
             return self.classify(row, node.false_branch)
 
 
-    def print_leaf(self, counts):
-        """A nicer way to print the predictions at a leaf."""
-        total = sum(counts.values()) * 1.0
-        probs = {}
-        for lbl in counts.keys():
-            probs[lbl] = str(int(counts[lbl] / total * 100)) + "%"
-        return probs
+   
