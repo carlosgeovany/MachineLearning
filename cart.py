@@ -56,12 +56,10 @@ class Decision_Node:
     def __init__(self,
                  question,
                  true_branch,
-                 false_branch,
-                 samples):
+                 false_branch):
         self.question = question
         self.true_branch = true_branch
         self.false_branch = false_branch
-        self.samples = samples
 
 def class_counts(rows):
     """Counts the number of each type of example in a dataset."""
@@ -129,7 +127,6 @@ class CART:
         best_question = None  # keep train of the feature / value that produced it
         current_uncertainty = self.gini(rows)
         n_features = len(rows[0]) - 1  # number of columns
-        
 
         for col in range(n_features):  # for each feature
 
@@ -156,7 +153,7 @@ class CART:
                 if gain >= best_gain:
                     best_gain, best_question = gain, question
 
-        return best_gain, best_question, current_uncertainty, sum(list(values))
+        return best_gain, best_question
 
 
     def fit(self, rows, depht=0):
@@ -167,11 +164,11 @@ class CART:
         giant stack traces.
         """
 
-        # Try partitioing the dataset on each of the unique attribute,
+        # Try partitioning the dataset on each of the unique attribute,
         # calculate the information gain,
         # and return the question that produces the highest gain.      
         
-        gain, question, gini, samples = self.find_best_split(rows)
+        gain, question = self.find_best_split(rows)
 
         # Base case: no further info gain
         # Since we can ask no further questions,
@@ -193,7 +190,7 @@ class CART:
         # This records the best feature / value to ask at this point,
         # as well as the branches to follow
         # dependingo on the answer.
-        return Decision_Node(question, true_branch, false_branch, samples)
+        return Decision_Node(question, true_branch, false_branch)
 
 
     def print_leaf(self, counts):
@@ -230,7 +227,9 @@ class CART:
 
         # Base case: we've reached a leaf
         if isinstance(node, Leaf):
-            return self.print_leaf(node.predictions)
+            # Find max prob prediction
+            best = self.print_leaf(node.predictions)
+            return max(best, key=lambda key: best[key])
 
         # Decide whether to follow the true-branch or the false-branch.
         # Compare the feature / value stored in the node,
