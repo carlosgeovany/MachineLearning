@@ -198,7 +198,7 @@ class CART:
         total = sum(counts.values()) * 1.0
         probs = {}
         for lbl in counts.keys():
-            probs[lbl] = str(int(counts[lbl] / total * 100)) + "%"
+            probs[lbl] = str(round((counts[lbl] / total * 100.0),2)) + "%"
         return probs
 
 
