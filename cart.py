@@ -74,9 +74,9 @@ def class_counts(rows):
 
 class CART:
 
-    def __init__(self, header, max_depth=None):
+    def __init__(self, header, max_depht=None):
         self.header = header
-        self.max_depth = max_depth
+        self.max_depth = max_depht
 
 
     def partition(self, rows, question):
