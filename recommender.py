@@ -58,7 +58,7 @@ class matrix_factorization():
 				self.V[i,j] += self.learning_rate * self.movie_gradient(j,i)
 
 
-	def fit(self,learning_rate=0.1, iterations=1000):
+	def fit(self,learning_rate=0.1, iterations=5):
 		
 		self.learning_rate = learning_rate
 		self.mse = []
