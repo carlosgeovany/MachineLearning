@@ -1,13 +1,13 @@
+import warnings
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 
+warnings.filterwarnings("ignore", category=RuntimeWarning) 
 
 movies_data = pd.read_csv("data/movies_metadata.csv", dtype={'movieid':'int64'})
 
 class matrix_factorization():
-
-	
 
 	def __init__(self,data,K):
 		self.ratings = data
@@ -95,3 +95,16 @@ class matrix_factorization():
 	def matrix(self):
 		return np.dot(self.U, self.V)
 
+
+def find_best(data, max_range=50, learning_rate=[0.001,0.01,0.1,1]):
+	mse = []
+	for k in range(1, max_range+1):
+	    for lr in (learning_rate):
+	        r = matrix_factorization(data,k)
+	        r.fit(lr, 100)
+	        me = np.mean(r.mse)
+	        mse.append([k,lr,me])
+	        if k % 10 == 0:
+	            print(f"K: {k}\t | Learning_rate: {lr}\t | MSE:{me}")
+	mse = pd.DataFrame(mse, columns=["K","Learning_rate","MSE"])
+	return mse
