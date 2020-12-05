@@ -1,11 +1,17 @@
 import numpy as np
+import pandas as pd
 from dataclasses import dataclass
 
 
+movies_data = pd.read_csv("data/movies_metadata.csv", dtype={'movieid':'int64'})
+
 class matrix_factorization():
 
+	
+
 	def __init__(self,data,K):
-		self.data = data
+		self.ratings = data
+		self.data = self.ratings.to_numpy()
 		self.K = K
 		self.lambd = 1
 		self.users = data.shape[0]
@@ -66,6 +72,17 @@ class matrix_factorization():
 			self.update_U()
 			self.update_V()
 			self.mse.append(self.MSE)
+
+
+	def top_recommends(self, user, top=5):
+		predictions = pd.DataFrame(
+									self.matrix, 
+								   	columns = self.ratings.columns, 
+								   	index = self.ratings.index).round()
+		predictions = predictions.unstack().reset_index(name='rating')
+		predictions = predictions.set_index('userId').sort_index(axis = 0)
+		top = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='rating')
+		return top.merge(movies_data, on='movieId', how='inner')
 
 
 	@property
