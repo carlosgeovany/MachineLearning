@@ -34,7 +34,7 @@ class matrix_factorization():
 		return grad
 
 
-	def user_gradient(self,user_row,user):
+	def U_gradient(self,user_row,user):
 
 		summ = 0
 		for col in range(self.movies):
@@ -42,7 +42,7 @@ class matrix_factorization():
 		return summ/self.movies
 
 
-	def movie_gradient(self,movie_col,movie):
+	def V_gradient(self,movie_col,movie):
 
 		summ = 0
 		for row in range(self.users):
@@ -54,14 +54,14 @@ class matrix_factorization():
 						
 		for i in range(self.users):
 			for j in range(self.K):
-				self.U[i,j] += self.learning_rate * self.user_gradient(i,j)
+				self.U[i,j] += self.learning_rate * self.U_gradient(i,j)
 
 
 	def update_V(self):
 		
 		for i in range(self.K):
 			for j in range(self.movies):
-				self.V[i,j] += self.learning_rate * self.movie_gradient(j,i)
+				self.V[i,j] += self.learning_rate * self.V_gradient(j,i)
 
 
 	def fit(self,learning_rate=0.1, iterations=2):
@@ -81,8 +81,8 @@ class matrix_factorization():
 								   	index = self.ratings.index).round()
 		predictions = predictions.unstack().reset_index(name='rating')
 		predictions = predictions.set_index('userId').sort_index(axis = 0)
-		top = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='rating')
-		return top.merge(movies_data, on='movieId', how='inner')
+		recommends = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='rating')
+		return recommends.merge(movies_data, on='movieId', how='inner')
 
 
 	@property
