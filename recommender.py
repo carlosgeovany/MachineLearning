@@ -5,8 +5,6 @@ from dataclasses import dataclass
 
 warnings.filterwarnings("ignore", category=RuntimeWarning) 
 
-movies_data = pd.read_csv("data/movies_metadata.csv", dtype={'movieid':'int64'})
-
 class matrix_factorization():
 
 	def __init__(self,data,K):
@@ -74,15 +72,19 @@ class matrix_factorization():
 			self.mse.append(self.MSE)
 
 
-	def top_recommends(self, user, top=5):
+	def top_recommends(self, user, top=5, movies_data):
 		predictions = pd.DataFrame(
 									self.matrix, 
 								   	columns = self.ratings.columns, 
 								   	index = self.ratings.index).round()
 		predictions = predictions.unstack().reset_index(name='rating')
 		predictions = predictions.set_index('userId').sort_index(axis = 0)
-		recommends = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='rating')
-		return recommends.merge(movies_data, on='movieId', how='inner')
+		try:
+			recommends = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='rating')
+			return recommends.merge(movies_data, on='movieId', how='inner')
+		except Exception as e: print(f"User: {e} not found")
+
+		
 
 
 	@property
