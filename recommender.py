@@ -82,9 +82,8 @@ class matrix_factorization():
 		try:
 			recommends = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='rating')
 			return recommends.merge(movies_data, on='movieId', how='inner')
-		except Exception as e: print(f"User: {e} not found")
-
-		
+		except Exception as e:
+			return (f"User: {e} not found")
 
 
 	@property
