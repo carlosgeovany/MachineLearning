@@ -72,7 +72,7 @@ class matrix_factorization():
 			self.mse.append(self.MSE)
 
 
-	def top_recommends(self, user, top=5, movies_data):
+	def top_recommends(self, user, movies_data, top=5):
 		predictions = pd.DataFrame(
 									self.matrix, 
 								   	columns = self.ratings.columns, 
@@ -80,7 +80,8 @@ class matrix_factorization():
 		predictions = predictions.unstack().reset_index(name='rating')
 		predictions = predictions.set_index('userId').sort_index(axis = 0)
 		try:
-			recommends = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='rating')
+			recommends = predictions.loc[user].groupby('movieId').first().rating.nlargest(top).reset_index(name='recommend')
+			recommends['recommend'] = recommends['recommend'].astype(int).apply(lambda x: ''.join('*' for _ in range(x)) if x > 0 else "+")
 			return recommends.merge(movies_data, on='movieId', how='inner')
 		except Exception as e:
 			return (f"User: {e} not found")
