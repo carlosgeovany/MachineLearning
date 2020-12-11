@@ -218,7 +218,7 @@ def find_best(data, max_Ks=10, learning_rate=[0.001,0.01,0.1,1], iterations=2):
 	mse = []
 	for k in range(1, max_Ks+1):
 	    for lr in (learning_rate):
-	        r = matrix_factorization(data,k)
+	        r = MatrixFactorization(data,k)
 	        r.fit(lr, iterations)
 	        me = np.mean(r.mse)
 	        mse.append([k,lr,me])
