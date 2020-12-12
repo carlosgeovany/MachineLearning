@@ -69,10 +69,10 @@ class MatrixFactorization():
 
 		if user != None:
 			rows = float(self.V[:,movie_col][user])
-			grad = 0.5*((rating - prediction) + self.lambd/2) * rows
+			grad = ((rating - prediction) + self.lambd/2) * rows
 		else:
 			columns = float(self.U[user_row,:][movie])
-			grad = 0.5*((rating - prediction) + self.lambd/2) * columns
+			grad = ((rating - prediction) + self.lambd/2) * columns
 		return grad
 
 
