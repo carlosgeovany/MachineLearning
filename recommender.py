@@ -42,10 +42,11 @@ class MatrixFactorization():
 
 	"""
 
-	def __init__(self,data,K):
+	def __init__(self,K,data,movies_data):
 		self.ratings = data
 		self.data = self.ratings.to_numpy()
 		self.K = K
+		self.movies_data = movies_data
 		self.lambd = 1
 		self.users = data.shape[0]
 		self.movies = data.shape[1]
@@ -144,14 +145,12 @@ class MatrixFactorization():
 			self.mse.append(self.MSE)
 
 
-	def top_recommends(self, user, movies_data, top=5):
+	def top_recommends(self, user, top=5):
 		"""
 		movies recommended for a user
 
 		:user:	int
 			a single user to recommend
-		:movies_data:	pandas df
-			df with movies metadata
 		:top:	int
 			max number of movies to be recommended
 		:return:	pandas df
@@ -184,10 +183,10 @@ class MatrixFactorization():
 
 		## get only certain columns
 		cols = ['movieId','title','original_language','genres','release_date']
-		movies_data = movies_data[cols]
+		movies_data = self.movies_data[cols]
 
 		## return recommendation with movies metadata df 
-		return recommendations.merge(movies_data, on='movieId', how='inner')
+		return recommendations.merge(movies_data, on='movieId', how='inner').drop(['level_0_x','level_0_y'], axis=1, errors='ignore')
 
 
 	@property
@@ -209,7 +208,7 @@ class MatrixFactorization():
 		return np.dot(self.U, self.V)
 
 
-def find_best(data, max_Ks=10, learning_rate=[0.001,0.01,0.1,1], iterations=2):
+def find_best( data, movies_data, max_Ks=10, learning_rate=[0.001,0.01,0.1,1], iterations=2):
 	"""
 	method to find best hyperparameters
 	:return: pandas df
@@ -218,7 +217,7 @@ def find_best(data, max_Ks=10, learning_rate=[0.001,0.01,0.1,1], iterations=2):
 	mse = []
 	for k in range(1, max_Ks+1):
 	    for lr in (learning_rate):
-	        r = MatrixFactorization(data,k)
+	        r = MatrixFactorization(k,data,movies_data)
 	        r.fit(lr, iterations)
 	        me = np.mean(r.mse)
 	        mse.append([k,lr,me])
