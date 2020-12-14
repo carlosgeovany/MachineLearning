@@ -2,6 +2,8 @@ import warnings
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
+from sklearn.metrics import ndcg_score
+
 
 ## Avoid zero division warning
 warnings.filterwarnings("ignore", category=RuntimeWarning) 
@@ -138,11 +140,11 @@ class MatrixFactorization():
 			how many iterations should we do to train
 		"""
 		self.learning_rate = learning_rate
-		self.mse = []
+		self.ndcg = []
 		for i in range(iterations):
 			self.update_U()
 			self.update_V()
-			self.mse.append(self.MSE)
+			self.ndcg.append(self.NDCG)
 
 
 	def top_recommends(self, user, top=5):
@@ -190,16 +192,6 @@ class MatrixFactorization():
 
 
 	@property
-	def MSE(self):
-		"""
-		:return: float
-			MSE for matrix product U*V 
-		"""
-				
-		matrix_product = np.matmul(self.U, self.V)
-		return np.sum((self.data - matrix_product)**2)
-
-	@property
 	def matrix(self):
 		"""
 		:return: float
@@ -208,23 +200,33 @@ class MatrixFactorization():
 		return np.dot(self.U, self.V)
 
 
+	@property
+	def NDCG(self):
+		"""
+		:return: float
+			NDCG for matrix product U*V 
+		"""
+				
+		#matrix_product = np.matmul(self.U, self.V)
+		#return np.sum((self.data - matrix_product)**2)
+		return ndcg_score(self.ratings, self.matrix)
+
+	
+
+
 def find_best( data, movies_data, max_Ks=10, learning_rate=[0.001,0.01,0.1,1], iterations=2):
-	"""
-	method to find best hyperparameters
-	:return: pandas df
-		df with hyperparameters calculated
-	"""
-	mse = []
-	for k in range(1, max_Ks+1):
-	    for lr in (learning_rate):
-	        r = MatrixFactorization(k,data,movies_data)
-	        r.fit(lr, iterations)
-	        me = np.mean(r.mse)
-	        mse.append([k,lr,me])
-	        if max_Ks < 10:
-	        	print(f"K: {k}\t | Learning_rate: {lr}\t | MSE:{me}")
-	        else:
-	        	if k % 10 == 0:
-	        		print(f"K: {k}\t | Learning_rate: {lr}\t | MSE:{me}")
-	mse = pd.DataFrame(mse, columns=["K","Learning_rate","MSE"])
-	return mse
+    errors = []
+    for k in range(1, max_Ks+1):
+        for lr in (learning_rate):
+            r = MatrixFactorization(k,data,movies_data)
+            r.fit(lr, iterations)
+            error = np.mean(r.NDCG)
+            errors.append([k,lr,error])
+            if max_Ks < 10:
+                print(f"K: {k}\t | Learning_rate: {lr}\t | NDCG:{error}")
+                print("\n")
+            else:
+                if k % 10 == 0:
+                    print(f"K: {k}\t | Learning_rate: {lr}\t | NDCG:{error}")
+                    print("\n")
+    return pd.DataFrame(errors, columns=["K","Learning_rate","NDCG"])
