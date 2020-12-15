@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 import pandas as pd
+from numpy import inf
 from dataclasses import dataclass
 from sklearn.metrics import ndcg_score
 
@@ -24,6 +25,10 @@ class MatrixFactorization():
 	"""
 
 	def __init__(self,ratings,movies_data):
+		"""
+		class constructor with original
+		rating matrix and movies data
+		"""
 		self.ratings = ratings
 		self.data = self.ratings.to_numpy()
 		self.movies_data = movies_data
@@ -32,7 +37,7 @@ class MatrixFactorization():
 	def fit(self, K=2, epochs=2, alpha=0.001):
 		"""
 		randomly initialize user/item factors from a Gaussian
-		and calculates  U and V
+		and calculates  U and V matrix
 		"""
 		users = self.data.shape[0]
 		movies = self.data.shape[1]
@@ -55,10 +60,12 @@ class MatrixFactorization():
 	def matrix(self):
 		"""
 		:return: float
-			dot product U*V
+			dot product U*V.T
 		"""
 		matrix = np.dot(self.U, self.V.T)
 		matrix[matrix < 0] = 0
+		matrix[matrix == -inf] = 0
+		matrix = np.nan_to_num(matrix)
 		return matrix
 
 	@property
@@ -67,16 +74,17 @@ class MatrixFactorization():
 		:return: float
 			NDCG for matrix product U*V using sckikit learn method
 		"""
+		#matrix = self.matrix()
 		return ndcg_score(self.ratings, self.matrix)
 
 
 
 	def estimate(self, u, m):
 		"""
-		auxiliar function to get predictions
+		auxiliar function to get predictions from User(i) and Movie(j)
 		"""
 		u,m = int(u), int(m)
-		return np.dot(self.U[3],self.V[3]).round()
+		return np.dot(self.U[u],self.V[m]).round()
 
 
 	def top_recommends(self, user, top=5):
@@ -123,11 +131,15 @@ class MatrixFactorization():
 
 
 def grid_search(clf, params):
+	"""
+	custom grid search method
+	"""
 	clfs = []
 	for k in params['Ks']:
 	    for alpha in params['alphas']:
 	        for epoch in params['epochs']:
-	            clf.fit(k,epoch, alpha)
+	            clf.fit(k,epoch, alpha) ## Fit the model with parameters
 	            print(f"K: {k}\t| alpha: {alpha}\t| epochs: {epoch}\t| NDCG: {clf.score}")
 	            clfs.append([k,alpha,epoch,clf.score,clf])
+	## return pandas df with clf obsjects
 	return pd.DataFrame(clfs, columns=["K","alpha","epochs","NDCG","clf"])
