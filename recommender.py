@@ -20,131 +20,63 @@ class MatrixFactorization():
 		contains the ratings
 	:data:	numpy array
 		ratings df as a numpy array
-	:K:	int
-		hyperparameter to iterate over
-	:lambd:	int
-		hyperparameter
-	:users:	int
-		total number of users
-	:movies:	int
-		total number of movies
-	:U: numpy array
-		random array with shape of users an K´s
-	:V:	numpy array
-		random array with shape of K´s and movies
-
-	Methods
-	-------
-
-	gradient(user_row, movie_col, user=None, movie=None)
-		calculates gradient descent between Uij and Vji
-
-	U_gradient(self,user_row,user)
-		calls gradient with user rows and accumulates the results
 
 	"""
 
-	def __init__(self,K,data,movies_data):
-		self.ratings = data
+	def __init__(self,ratings,movies_data):
+		self.ratings = ratings
 		self.data = self.ratings.to_numpy()
-		self.K = K
 		self.movies_data = movies_data
-		self.lambd = 1
-		self.users = data.shape[0]
-		self.movies = data.shape[1]
-		self.U = np.random.uniform(low=0.1, high=0.9, size=(self.users, self.K))
-		self.V = np.random.uniform(low=0.1, high=0.9, size=(self.K, self.movies))
 
 
-	def gradient(self, user_row, movie_col, user=None, movie=None):
+	def fit(self, K=2, epochs=2, alpha=0.001):
 		"""
-		calculates gradient descent between Uij and Vji
-
-		:user_row: one user row with movies ratings
-		:movie_col:one movie_col with users ratings
-		:user: to match condition for calculate gradient on users
-		:movie: to match condition for calculate gradient on movies
-
-		:return: calculated gradient
+		randomly initialize user/item factors from a Gaussian
+		and calculates  U and V
 		"""
-		rating = float(self.data[user_row,movie_col])
-		prediction = float(np.dot(self.U[user_row,:],self.V[:,movie_col]))
+		users = self.data.shape[0]
+		movies = self.data.shape[1]
+		U = np.random.normal(0,.1,(users,K))
+		V = np.random.normal(0,.1,(movies,K))
 
-		if user != None:
-			rows = float(self.V[:,movie_col][user])
-			grad = ((rating - prediction) + self.lambd/2) * rows
-		else:
-			columns = float(self.U[user_row,:][movie])
-			grad = ((rating - prediction) + self.lambd/2) * columns
-		return grad
+		for epoch in range(epochs):
+			for u in range(users):
+				for m in range (movies):
+					Y = self.data[u][m] - np.dot(U[u],V[m])
+					temp = U[u,:]
+					U[u,:] +=  alpha * Y * V[m]
+					V[m,:] +=  alpha * Y * temp
+
+		self.U = U
+		self.V = V
 
 
-	def U_gradient(self,user_row,user):
+	@property
+	def matrix(self):
 		"""
-		calls gradient with user rows and accumulates the results
-
-		:user_row:	array
-			array with all users
-		:user:	int
-			one user
-
-		:return: summ of gradients
+		:return: float
+			dot product U*V
 		"""
-		summ = 0
-		for col in range(self.movies):
-			summ += self.gradient(user_row,col,user)
-		return summ/self.movies
+		matrix = np.dot(self.U, self.V.T)
+		matrix[matrix < 0] = 0
+		return matrix
 
-
-	def V_gradient(self,movie_col,movie):
+	@property
+	def score(self):
 		"""
-		calls gradient with movie column and accumulates the results
-
-		:movie_col:	array
-		:movie: int
-			one movie
-
-		:return: summ of gradients
+		:return: float
+			NDCG for matrix product U*V using sckikit learn method
 		"""
-		summ = 0
-		for row in range(self.users):
-			summ += self.gradient(row,movie_col,movie)
-		return summ/self.users
+		return ndcg_score(self.ratings, self.matrix)
 
 
-	def update_U(self):
+
+	def estimate(self, u, m):
 		"""
-		update users matrix
-		"""	
-		for i in range(self.users):
-			for j in range(self.K):
-				self.U[i,j] += self.learning_rate * self.U_gradient(i,j)
-
-
-	def update_V(self):
+		auxiliar function to get predictions
 		"""
-		update moves matrix
-		"""
-		for i in range(self.K):
-			for j in range(self.movies):
-				self.V[i,j] += self.learning_rate * self.V_gradient(j,i)
-
-
-	def fit(self,learning_rate=0.1, iterations=2):
-		"""
-		train the recommender
-
-		:learning_rate: float
-			hyperparameter
-		:iterations: int
-			how many iterations should we do to train
-		"""
-		self.learning_rate = learning_rate
-		self.ndcg = []
-		for i in range(iterations):
-			self.update_U()
-			self.update_V()
-			self.ndcg.append(self.NDCG)
+		u,m = int(u), int(m)
+		return np.dot(self.U[3],self.V[3]).round()
 
 
 	def top_recommends(self, user, top=5):
@@ -160,7 +92,6 @@ class MatrixFactorization():
 		"""
 		## Reformat full matrix
 		pred_matrix = (pd.DataFrame(self.matrix, columns = self.ratings.columns, index = self.ratings.index).
-	               round().
 	               unstack().
 	               reset_index(name='rating').
 	               set_index('userId').sort_index(axis = 0).
@@ -179,9 +110,9 @@ class MatrixFactorization():
 
 		## find movies not seen by user and find the top movies by predicted rating
 		recommendations = pred[pred.rating == 0].sort_values('Must watch?', ascending=False)[:top]
-		recommendations['Must watch?'] = (recommendations['Must watch?'].
-					astype(int).
-					apply(lambda x: ''.join(u'\u2713' for _ in range(x)) if x > 0 else u'\u2A09')) ##looks cooler with symbols
+		recommendations['Must watch?'] = (recommendations.apply(lambda x: self.estimate(x.userId, x.movieId), axis=1).
+											astype(int).
+											apply(lambda x: ''.join(u'\u2713' for _ in range(x)) if x*100 > 0 else u'\u2A09')) ##looks cooler with symbols
 
 		## get only certain columns
 		cols = ['movieId','title','original_language','genres','release_date']
@@ -191,42 +122,12 @@ class MatrixFactorization():
 		return recommendations.merge(movies_data, on='movieId', how='inner').drop(['level_0_x','level_0_y'], axis=1, errors='ignore')
 
 
-	@property
-	def matrix(self):
-		"""
-		:return: float
-			dot product U*V
-		"""
-		return np.dot(self.U, self.V)
-
-
-	@property
-	def NDCG(self):
-		"""
-		:return: float
-			NDCG for matrix product U*V 
-		"""
-				
-		#matrix_product = np.matmul(self.U, self.V)
-		#return np.sum((self.data - matrix_product)**2)
-		return ndcg_score(self.ratings, self.matrix)
-
-	
-
-
-def find_best( data, movies_data, max_Ks=10, learning_rate=[0.001,0.01,0.1,1], iterations=2):
-    errors = []
-    for k in range(1, max_Ks+1):
-        for lr in (learning_rate):
-            r = MatrixFactorization(k,data,movies_data)
-            r.fit(lr, iterations)
-            error = np.mean(r.NDCG)
-            errors.append([k,lr,error])
-            if max_Ks < 10:
-                print(f"K: {k}\t | Learning_rate: {lr}\t | NDCG:{error}")
-                print("\n")
-            else:
-                if k % 10 == 0:
-                    print(f"K: {k}\t | Learning_rate: {lr}\t | NDCG:{error}")
-                    print("\n")
-    return pd.DataFrame(errors, columns=["K","Learning_rate","NDCG"])
+def grid_search(clf, params):
+	clfs = []
+	for k in params['Ks']:
+	    for alpha in params['alphas']:
+	        for epoch in params['epochs']:
+	            clf.fit(k,epoch, alpha)
+	            print(f"K: {k}\t| alpha: {alpha}\t| epochs: {epoch}\t| NDCG: {clf.score}")
+	            clfs.append([k,alpha,epoch,clf.score,clf])
+	return pd.DataFrame(clfs, columns=["K","alpha","epochs","NDCG","clf"])
