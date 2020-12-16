@@ -183,7 +183,7 @@ class MatrixFactorization():
 											apply(lambda x: ''.join( "\U0001f600" for _ in range(x)) if x > 1 else "\U0001f641")) ##looks cooler with symbols
 
 		## get only certain columns
-		cols = ['movieId','title','original_language','genres','release_date']
+		cols = ['movieId','title','original_language','genres','release_date','runtime']
 		movies_data = self.movies_data[cols]
 
 		## return recommendation with movies metadata df 
